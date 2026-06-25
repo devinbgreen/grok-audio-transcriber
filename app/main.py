@@ -6,6 +6,8 @@ import os
 from dotenv import load_dotenv
 
 from app.models.base import Base, engine
+from app.routes.auth import router as auth_router
+from app.routes.recordings import router as recordings_router
 
 load_dotenv()
 
@@ -36,7 +38,8 @@ async def home(request):
 def startup_event():
     Base.metadata.create_all(bind=engine)
 
-# TODO: Add routes for auth, audio upload, transcription, etc.
+app.include_router(auth_router)
+app.include_router(recordings_router)
 
 if __name__ == "__main__":
     import uvicorn
