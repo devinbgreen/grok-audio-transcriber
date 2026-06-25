@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./audio_storage:/app/audio_storage
+      - ./database:/app/database
+    env_file:
+      - .env
+    restart: unless-stopped
