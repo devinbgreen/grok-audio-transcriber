@@ -157,29 +157,43 @@
             try {
                 const res = await fetch("/recordings/upload", {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${currentToken}` },
+                    headers: { 
+                        "Authorization": `Bearer ${currentToken}` 
+                    },
                     body: formData
                 });
 
-                const data = await res.json();
+                const text = await res.text();
+                let data;
                 
-                if (data.segments) {
-                    currentSegments = data.segments;
-                    renderDiarizedTranscript(data.segments);
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("Server response:", text);
+                    throw new Error("Server error: " + (text || "Unknown error"));
+                }
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Upload failed");
+                }
+
+                if (data.segments || data.diarized_html) {
+                    // Success handling...
+                    currentSegments = data.segments || [];
+                    document.getElementById("diarizedTranscript").innerHTML = data.diarized_html || 
+                        currentSegments.map(...).join('');
                     document.getElementById("transcriptCard").classList.remove("hidden");
                     
                     currentAudioUrl = URL.createObjectURL(blob);
                     const player = document.getElementById("audioPlayer");
                     player.src = currentAudioUrl;
-                    currentRecordingId = data.id;
                     
-                    document.getElementById("status").textContent = "Transcription complete! Click segments below.";
+                    document.getElementById("status").textContent = "Transcription complete!";
                     loadHistory();
-                } else {
-                    alert("Upload successful but no segments returned");
                 }
             } catch (err) {
                 console.error(err);
+                document.getElementById("status").textContent = "Upload failed. Check console.";
                 alert("Upload failed: " + err.message);
             }
         }

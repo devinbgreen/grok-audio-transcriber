@@ -22,8 +22,10 @@ class User(Base):
         return pwd_context.verify(plain_password, self.hashed_password)
 
     @staticmethod
-    def hash_password(password):
-        # Fix for bcrypt 72-byte limit
-        if len(password.encode('utf-8')) > 72:
-            password = password[:72]
+    def hash_password(password: str):
+        """Robust bcrypt hashing with length limit"""
+        # Truncate to 72 bytes to avoid bcrypt error
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password = password_bytes[:72].decode('utf-8', errors='ignore')
         return pwd_context.hash(password)
