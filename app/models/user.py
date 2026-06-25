@@ -16,11 +16,14 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    recordings = relationship("Recording", back_populates="owner", cascade="all, delete-orphan")   # String reference
+    recordings = relationship("Recording", back_populates="owner", cascade="all, delete-orphan")
 
     def verify_password(self, plain_password):
         return pwd_context.verify(plain_password, self.hashed_password)
 
     @staticmethod
     def hash_password(password):
+        # Fix for bcrypt 72-byte limit
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]
         return pwd_context.hash(password)
