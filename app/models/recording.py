@@ -20,7 +20,7 @@ AUDIO_STORAGE = "audio_storage"
 os.makedirs(AUDIO_STORAGE, exist_ok=True)
 
 def group_by_speaker(words):
-    """Return structured segments with timestamps for clickable playback"""
+    """Convert word-level diarization into clickable sentence/turn segments"""
     if not words:
         return []
     
@@ -34,7 +34,6 @@ def group_by_speaker(words):
         word_start = word.get("start")
         
         if speaker != current_speaker and current_text:
-            # Finish previous segment
             segments.append({
                 "speaker": current_speaker,
                 "text": " ".join(current_text),
@@ -43,7 +42,7 @@ def group_by_speaker(words):
             })
             current_text = []
         
-        if not current_text:  # New segment
+        if not current_text:
             current_start = word_start
         
         current_speaker = speaker
@@ -69,7 +68,7 @@ async def upload_recording(
     if not file.filename.lower().endswith(('.webm', '.wav', '.mp3', '.m4a')):
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
-    # Save audio
+    # Save audio file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{current_user.id}_{timestamp}_{file.filename}"
     file_path = os.path.join(AUDIO_STORAGE, filename)
@@ -77,14 +76,14 @@ async def upload_recording(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # Duration
+    # Get duration
     audio = AudioSegment.from_file(file_path)
     duration = len(audio) // 1000
 
-    # Transcription with diarization + segments
+    # Transcription with diarization
     transcript, raw_metadata, segments = await transcribe_with_grok(file_path)
 
-    # Save to DB
+    # Save to database
     recording = Recording(
         filename=filename,
         file_path=file_path,
@@ -101,15 +100,15 @@ async def upload_recording(
         "id": recording.id,
         "filename": filename,
         "transcript": transcript,
-        "segments": segments,           # ← For clickable playback
+        "segments": segments,           # Used for clickable sentence playback
         "duration": duration,
-        "message": "Recording transcribed with speaker diarization!"
+        "message": "Recording saved with speaker diarization!"
     })
 
 async def transcribe_with_grok(audio_path: str):
     if not XAI_API_KEY:
         return "STT API key not configured", None, []
-
+    
     try:
         with open(audio_path, "rb") as f:
             audio_data = f.read()
@@ -143,10 +142,7 @@ async def transcribe_with_grok(audio_path: str):
         return err, None, []
 
 @router.get("/")
-async def list_recordings(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def list_recordings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     recordings = db.query(Recording).filter(
         Recording.owner_id == current_user.id
     ).order_by(Recording.created_at.desc()).all()
@@ -154,9 +150,9 @@ async def list_recordings(
     return [{
         "id": r.id,
         "filename": r.filename,
-        "transcript": r.transcript[:150] + "..." if r.transcript and len(r.transcript) > 150 else r.transcript,
+        "transcript": (r.transcript or "")[:150] + "..." if r.transcript and len(r.transcript) > 150 else (r.transcript or ""),
         "duration": r.duration,
-        "created_at": r.created_at.isoformat(),
+        "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in recordings]
 
 @router.delete("/{recording_id}")
@@ -167,3 +163,19 @@ async def delete_recording(
 ):
     recording = db.query(Recording).filter(
         Recording.id == recording_id,
+        Recording.owner_id == current_user.id
+    ).first()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    
+    if os.path.exists(recording.file_path):
+        try:
+            os.remove(recording.file_path)
+        except:
+            pass
+    
+    db.delete(recording)
+    db.commit()
+    
+    return {"message": "Recording deleted successfully"}

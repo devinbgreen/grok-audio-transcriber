@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from app.models.base import Base, engine
 from app.routes.auth import router as auth_router
-from app.routes.recordings import router as recordings_router
+from app.routes.recordings import router as recordings_router   # ← Added
 
 load_dotenv()
 
@@ -39,7 +39,7 @@ def startup_event():
     Base.metadata.create_all(bind=engine)
 
 app.include_router(auth_router)
-app.include_router(recordings_router)
+app.include_router(recordings_router)   # ← Now included
 
 if __name__ == "__main__":
     import uvicorn
