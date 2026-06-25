@@ -1,0 +1,47 @@
+/* Custom styles for Grok Audio Transcriber */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Recording button animation */
+#recordBtn.recording {
+    animation: pulse 1.5s infinite;
+    background-color: rgb(185 28 28); /* red-700 */
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        transform: scale(1); 
+    }
+    50% { 
+        transform: scale(1.08); 
+    }
+}
+
+/* Transcript highlight styles */
+.transcript-segment {
+    transition: all 0.2s ease;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.transcript-segment:hover {
+    background-color: #f3f4f6;
+}
+
+.transcript-segment.playing {
+    background-color: #dbeafe;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+/* Nice scrollbar for transcript area */
+.transcript-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.transcript-container::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 20px;
+}
