@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import os
@@ -20,31 +20,45 @@ AUDIO_STORAGE = "audio_storage"
 os.makedirs(AUDIO_STORAGE, exist_ok=True)
 
 def group_by_speaker(words):
-    """Group words into speaker turns with colors for nice display"""
+    """Return structured segments with timestamps for clickable playback"""
     if not words:
-        return ""
-    turns = []
+        return []
+    
+    segments = []
     current_speaker = None
     current_text = []
+    current_start = None
     
     for word in words:
         speaker = word.get("speaker", 0)
+        word_start = word.get("start")
+        
         if speaker != current_speaker and current_text:
-            turns.append((current_speaker, " ".join(current_text)))
+            # Finish previous segment
+            segments.append({
+                "speaker": current_speaker,
+                "text": " ".join(current_text),
+                "start": current_start,
+                "end": word_start or (current_start + 2)
+            })
             current_text = []
+        
+        if not current_text:  # New segment
+            current_start = word_start
+        
         current_speaker = speaker
         current_text.append(word.get("text", ""))
     
+    # Last segment
     if current_text:
-        turns.append((current_speaker, " ".join(current_text)))
+        segments.append({
+            "speaker": current_speaker,
+            "text": " ".join(current_text),
+            "start": current_start,
+            "end": words[-1].get("end", current_start + 2) if words else current_start
+        })
     
-    # Color mapping for different speakers
-    colors = ["#1e40af", "#166534", "#9f1239", "#854d0e"]
-    formatted = []
-    for s, text in turns:
-        color = colors[s % len(colors)]
-        formatted.append(f'<span style="color:{color};font-weight:500;">Speaker {s+1}:</span> {text}')
-    return "<br>".join(formatted)
+    return segments
 
 @router.post("/upload")
 async def upload_recording(
@@ -67,8 +81,8 @@ async def upload_recording(
     audio = AudioSegment.from_file(file_path)
     duration = len(audio) // 1000
 
-    # Transcription with diarization
-    transcript, raw_metadata, diarized_html = await transcribe_with_grok(file_path)
+    # Transcription with diarization + segments
+    transcript, raw_metadata, segments = await transcribe_with_grok(file_path)
 
     # Save to DB
     recording = Recording(
@@ -87,14 +101,14 @@ async def upload_recording(
         "id": recording.id,
         "filename": filename,
         "transcript": transcript,
-        "diarized_html": diarized_html,
+        "segments": segments,           # ← For clickable playback
         "duration": duration,
         "message": "Recording transcribed with speaker diarization!"
     })
 
 async def transcribe_with_grok(audio_path: str):
     if not XAI_API_KEY:
-        return "STT API key not configured", None, None
+        return "STT API key not configured", None, []
 
     try:
         with open(audio_path, "rb") as f:
@@ -114,20 +128,36 @@ async def transcribe_with_grok(audio_path: str):
             
             if response.status_code != 200:
                 err = f"STT Error: {response.text}"
-                return err, None, err
+                return err, None, []
 
             result = response.json()
             transcript = result.get("text", "")
             raw_metadata = json.dumps(result)
             
-            # Generate diarized HTML for frontend
             words = result.get("words", [])
-            diarized_html = group_by_speaker(words)
+            segments = group_by_speaker(words)
             
-            return transcript, raw_metadata, diarized_html
+            return transcript, raw_metadata, segments
     except Exception as e:
         err = f"Transcription failed: {str(e)}"
-        return err, None, err
+        return err, None, []
+
+@router.get("/")
+async def list_recordings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    recordings = db.query(Recording).filter(
+        Recording.owner_id == current_user.id
+    ).order_by(Recording.created_at.desc()).all()
+    
+    return [{
+        "id": r.id,
+        "filename": r.filename,
+        "transcript": r.transcript[:150] + "..." if r.transcript and len(r.transcript) > 150 else r.transcript,
+        "duration": r.duration,
+        "created_at": r.created_at.isoformat(),
+    } for r in recordings]
 
 @router.delete("/{recording_id}")
 async def delete_recording(
@@ -137,17 +167,3 @@ async def delete_recording(
 ):
     recording = db.query(Recording).filter(
         Recording.id == recording_id,
-        Recording.owner_id == current_user.id
-    ).first()
-    
-    if not recording:
-        raise HTTPException(status_code=404, detail="Recording not found")
-    
-    # Delete file from disk
-    if os.path.exists(recording.file_path):
-        os.remove(recording.file_path)
-    
-    db.delete(recording)
-    db.commit()
-    
-    return {"message": "Recording deleted successfully"}
