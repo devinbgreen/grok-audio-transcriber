@@ -128,3 +128,26 @@ async def transcribe_with_grok(audio_path: str):
     except Exception as e:
         err = f"Transcription failed: {str(e)}"
         return err, None, err
+
+@router.delete("/{recording_id}")
+async def delete_recording(
+    recording_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    recording = db.query(Recording).filter(
+        Recording.id == recording_id,
+        Recording.owner_id == current_user.id
+    ).first()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    
+    # Delete file from disk
+    if os.path.exists(recording.file_path):
+        os.remove(recording.file_path)
+    
+    db.delete(recording)
+    db.commit()
+    
+    return {"message": "Recording deleted successfully"}
