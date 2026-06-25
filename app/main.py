@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,13 +7,13 @@ from dotenv import load_dotenv
 
 from app.models.base import Base, engine
 from app.routes.auth import router as auth_router
-from app.routes.recordings import router as recordings_router   # ← Added
+from app.routes.recordings import router as recordings_router
 
 load_dotenv()
 
 app = FastAPI(title="Grok Audio Transcriber")
 
-# Mount static files
+# Mount static files (CSS, JS)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Templates
@@ -29,8 +29,7 @@ app.add_middleware(
 )
 
 @app.get("/")
-async def home(request):
-    from fastapi import Request
+async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # Create database tables on startup
@@ -38,8 +37,9 @@ async def home(request):
 def startup_event():
     Base.metadata.create_all(bind=engine)
 
+# Include routers
 app.include_router(auth_router)
-app.include_router(recordings_router)   # ← Now included
+app.include_router(recordings_router)
 
 if __name__ == "__main__":
     import uvicorn
