@@ -1,13 +1,15 @@
-version: '3.8'
+FROM python:3.12-slim
 
-services:
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./audio_storage:/app/audio_storage
-      - ./database:/app/database
-    env_file:
-      - .env
-    restart: unless-stopped
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Create directories
+RUN mkdir -p audio_storage database
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

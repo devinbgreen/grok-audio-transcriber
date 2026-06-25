@@ -16,7 +16,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    recordings = relationship("Recording", back_populates="owner", cascade="all, delete-orphan")
+    recordings = relationship("Recording", back_populates="owner", cascade="all, delete-orphan")   # String reference
 
     def verify_password(self, plain_password):
         return pwd_context.verify(plain_password, self.hashed_password)
