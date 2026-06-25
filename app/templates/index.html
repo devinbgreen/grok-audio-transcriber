@@ -1,86 +1,41 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grok Audio Transcriber</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body class="bg-gray-50 font-sans">
-    <div class="min-h-screen">
-        <!-- Navbar -->
-        <nav class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold">G</div>
-                    <h1 class="text-2xl font-semibold text-gray-900">Grok Transcriber</h1>
-                </div>
-                <div class="flex items-center space-x-6">
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Dashboard</a>
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Record</a>
-                    <button onclick="showLogin()" 
-                            class="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                        Login
-                    </button>
-                </div>
-            </div>
-        </nav>
-
-        <div class="max-w-4xl mx-auto px-6 py-12">
-            <div class="text-center mb-12">
-                <h2 class="text-5xl font-bold text-gray-900 mb-4">Record • Transcribe • Review</h2>
-                <p class="text-xl text-gray-600 max-w-md mx-auto">Powered by Grok STT. Beautiful transcripts with speaker diarization.</p>
-            </div>
-
-            <!-- Record Section -->
-            <div class="bg-white rounded-3xl shadow-xl p-10 mb-12">
-                <div class="flex flex-col items-center">
-                    <button id="recordBtn"
-                            onclick="toggleRecording()"
-                            class="w-32 h-32 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center text-6xl shadow-lg transition-all active:scale-95">
-                        🎤
-                    </button>
-                    <p id="status" class="mt-6 text-lg font-medium text-gray-500">Ready to record</p>
-                    <p id="timer" class="text-3xl font-mono text-gray-400 mt-2">00:00</p>
-                </div>
-            </div>
-
-            <!-- Recent Transcripts Placeholder -->
-            <div class="bg-white rounded-3xl shadow p-8">
-                <h3 class="text-xl font-semibold mb-6">Your Recent Recordings</h3>
-                <div id="transcripts-list" class="space-y-4">
-                    <!-- Populated by JS/HTMX later -->
-                </div>
-            </div>
+<!-- Add this improved modal section inside the body of index.html -->
+<div id="authModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl p-8 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-6">
+            <h3 id="modalTitle" class="text-2xl font-bold">Create Account</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
         </div>
-    </div>
 
-    <!-- Login Modal (placeholder) -->
-    <div id="loginModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center">
-        <div class="bg-white rounded-3xl p-8 w-full max-w-md">
-            <h3 class="text-2xl font-bold mb-6">Login</h3>
-            <input type="email" placeholder="Email" class="w-full px-4 py-3 border rounded-2xl mb-4">
-            <input type="password" placeholder="Password" class="w-full px-4 py-3 border rounded-2xl mb-6">
-            <button onclick="fakeLogin()" 
-                    class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-semibold">
-                Sign In
+        <div id="registerForm">
+            <input id="regFullName" type="text" placeholder="Full Name" 
+                   class="w-full px-4 py-3 border rounded-2xl mb-4">
+            <input id="regEmail" type="email" placeholder="Email" 
+                   class="w-full px-4 py-3 border rounded-2xl mb-4">
+            <input id="regPassword" type="password" placeholder="Password" 
+                   class="w-full px-4 py-3 border rounded-2xl mb-6">
+            <button onclick="registerUser()" 
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-semibold">
+                Register
             </button>
+            <p class="text-center mt-4 text-sm text-gray-600">
+                Already have an account? 
+                <a href="#" onclick="switchToLogin()" class="text-indigo-600 hover:underline">Login</a>
+            </p>
+        </div>
+
+        <div id="loginForm" class="hidden">
+            <input id="loginEmail" type="email" placeholder="Email" 
+                   class="w-full px-4 py-3 border rounded-2xl mb-4">
+            <input id="loginPassword" type="password" placeholder="Password" 
+                   class="w-full px-4 py-3 border rounded-2xl mb-6">
+            <button onclick="loginUser()" 
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-semibold">
+                Login
+            </button>
+            <p class="text-center mt-4 text-sm text-gray-600">
+                No account yet? 
+                <a href="#" onclick="switchToRegister()" class="text-indigo-600 hover:underline">Register</a>
+            </p>
         </div>
     </div>
-
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        let timerInterval;
-        let seconds = 0;
-
-        function toggleRecording() {
-            // ... (recording logic)
-        }
-
-        // Full recording + upload logic included (see previous output for complete JS)
-    </script>
-</body>
-</html>
+</div>
