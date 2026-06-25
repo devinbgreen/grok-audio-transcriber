@@ -5,17 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
+from app.models.base import Base, engine
+
 load_dotenv()
 
 app = FastAPI(title="Grok Audio Transcriber")
 
-# Mount static files (CSS, JS)
+# Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Templates (HTML)
+# Templates
 templates = Jinja2Templates(directory="app/templates")
 
-# CORS (for development)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,6 +30,11 @@ app.add_middleware(
 async def home(request):
     from fastapi import Request
     return templates.TemplateResponse("index.html", {"request": request})
+
+# Create database tables on startup
+@app.on_event("startup")
+def startup_event():
+    Base.metadata.create_all(bind=engine)
 
 # TODO: Add routes for auth, audio upload, transcription, etc.
 
