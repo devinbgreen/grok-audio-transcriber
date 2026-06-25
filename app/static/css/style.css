@@ -1,47 +1,72 @@
-/* Custom styles for Grok Audio Transcriber */
+/* Enhanced styles for Grok Audio Transcriber + Diarization Visualization */
+
 body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Recording button animation */
+/* Recording Button Pulse Animation */
 #recordBtn.recording {
-    animation: pulse 1.5s infinite;
-    background-color: rgb(185 28 28); /* red-700 */
+    animation: pulse 1.2s infinite ease-in-out;
+    background-color: #b91c1c !important;
+    box-shadow: 0 0 0 12px rgba(185, 28, 28, 0.3);
 }
 
 @keyframes pulse {
-    0%, 100% { 
-        transform: scale(1); 
-    }
-    50% { 
-        transform: scale(1.08); 
-    }
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
 }
 
-/* Transcript highlight styles */
-.transcript-segment {
-    transition: all 0.2s ease;
-    padding: 4px 8px;
+/* Transcript Visualization */
+#diarizedTranscript {
+    line-height: 1.75;
+}
+
+#diarizedTranscript span[style*="color"] {
+    padding: 2px 6px;
     border-radius: 6px;
+    transition: all 0.2s ease;
     cursor: pointer;
+    display: inline-block;
+    margin: 1px 0;
 }
 
-.transcript-segment:hover {
-    background-color: #f3f4f6;
+#diarizedTranscript span[style*="color"]:hover {
+    background-color: #e0f2fe;
+    transform: translateX(4px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.transcript-segment.playing {
-    background-color: #dbeafe;
-    color: #1e40af;
+/* Playing highlight */
+#diarizedTranscript .playing {
+    background-color: #dbeafe !important;
+    border-left: 4px solid #2563eb;
+    padding-left: 8px;
     font-weight: 500;
 }
 
-/* Nice scrollbar for transcript area */
+/* Audio Player Styling */
+audio {
+    accent-color: #4f46e5;
+}
+
+/* History Cards */
+.recording-card {
+    transition: all 0.2s ease;
+}
+
+.recording-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Nice scrollbar */
 .transcript-container::-webkit-scrollbar {
     width: 6px;
 }
-
 .transcript-container::-webkit-scrollbar-thumb {
-    background-color: #d1d5db;
+    background-color: #cbd5e1;
     border-radius: 20px;
+}
+.transcript-container::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
 }
