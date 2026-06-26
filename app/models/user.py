@@ -2,9 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .base import Base
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 class User(Base):
     __tablename__ = "users"
@@ -18,14 +16,14 @@ class User(Base):
 
     recordings = relationship("Recording", back_populates="owner", cascade="all, delete-orphan")
 
-    def verify_password(self, plain_password):
-        return pwd_context.verify(plain_password, self.hashed_password)
+    def verify_password(self, plain_password: str) -> bool:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), self.hashed_password.encode('utf-8'))
 
     @staticmethod
-    def hash_password(password: str):
-        """Robust bcrypt hashing with length limit"""
-        # Truncate to 72 bytes to avoid bcrypt error
-        password_bytes = password.encode('utf-8')
-        if len(password_bytes) > 72:
-            password = password_bytes[:72].decode('utf-8', errors='ignore')
-        return pwd_context.hash(password)
+    def hash_password(password: str) -> str:
+        """Simple, reliable bcrypt hashing"""
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return hashed.decode('utf-8')

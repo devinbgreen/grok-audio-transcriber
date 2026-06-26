@@ -20,31 +20,44 @@ AUDIO_STORAGE = "audio_storage"
 os.makedirs(AUDIO_STORAGE, exist_ok=True)
 
 def group_by_speaker(words):
-    """Group words into speaker turns for nice display"""
+    """Convert Grok STT words into clickable speaker segments"""
     if not words:
-        return ""
-    turns = []
+        return []
+    
+    segments = []
     current_speaker = None
     current_text = []
+    current_start = None
     
     for word in words:
         speaker = word.get("speaker", 0)
+        word_start = word.get("start")
+        
         if speaker != current_speaker and current_text:
-            turns.append((current_speaker, " ".join(current_text)))
+            segments.append({
+                "speaker": current_speaker,
+                "text": " ".join(current_text),
+                "start": current_start,
+                "end": word_start or (current_start + 2)
+            })
             current_text = []
+        
+        if not current_text:
+            current_start = word_start
+        
         current_speaker = speaker
         current_text.append(word.get("text", ""))
     
+    # Last segment
     if current_text:
-        turns.append((current_speaker, " ".join(current_text)))
+        segments.append({
+            "speaker": current_speaker,
+            "text": " ".join(current_text),
+            "start": current_start,
+            "end": words[-1].get("end", current_start + 2) if words else current_start
+        })
     
-    # Color mapping
-    colors = ["#1e40af", "#166534", "#9f1239", "#854d0e"]
-    formatted = []
-    for s, text in turns:
-        color = colors[s % len(colors)]
-        formatted.append(f'<span style="color:{color};font-weight:500;">Speaker {s+1}:</span> {text}')
-    return "<br>".join(formatted)
+    return segments
 
 @router.post("/upload")
 async def upload_recording(
@@ -55,7 +68,7 @@ async def upload_recording(
     if not file.filename.lower().endswith(('.webm', '.wav', '.mp3', '.m4a')):
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
-    # Save audio
+    # Save audio file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{current_user.id}_{timestamp}_{file.filename}"
     file_path = os.path.join(AUDIO_STORAGE, filename)
@@ -63,14 +76,14 @@ async def upload_recording(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # Duration
+    # Get duration
     audio = AudioSegment.from_file(file_path)
     duration = len(audio) // 1000
 
-    # Transcription with diarization
-    transcript, raw_metadata, diarized_html = await transcribe_with_grok(file_path)
+    # Transcription with Grok STT + diarization
+    transcript, raw_metadata, segments = await transcribe_with_grok(file_path)
 
-    # Save to DB
+    # Save to database
     recording = Recording(
         filename=filename,
         file_path=file_path,
@@ -87,22 +100,22 @@ async def upload_recording(
         "id": recording.id,
         "filename": filename,
         "transcript": transcript,
-        "diarized_html": diarized_html,
+        "segments": segments,
         "duration": duration,
-        "message": "Recording transcribed with speaker diarization!"
+        "message": "Recording saved and transcribed!"
     })
 
 async def transcribe_with_grok(audio_path: str):
-    if not XAI_API_KEY:
-        return "STT API key not configured", None, None
+    if not XAI_API_KEY or XAI_API_KEY == "your_xai_api_key_here":
+        return "STT API key not configured. Please add XAI_API_KEY to .env", None, []
 
     try:
         with open(audio_path, "rb") as f:
             audio_data = f.read()
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.x.ai/v1/audio/transcriptions",
+                "https://api.x.ai/v1/stt",                    # Correct Grok STT endpoint
                 headers={"Authorization": f"Bearer {XAI_API_KEY}"},
                 files={"file": audio_data},
                 data={
@@ -113,27 +126,28 @@ async def transcribe_with_grok(audio_path: str):
             )
             
             if response.status_code != 200:
-                err = f"STT Error: {response.text}"
-                return err, None, err
+                error_text = response.text[:200]
+                print(f"STT API Error: {response.status_code} - {error_text}")
+                return f"STT Error: {error_text}", None, []
 
             result = response.json()
             transcript = result.get("text", "")
             raw_metadata = json.dumps(result)
             
             words = result.get("words", [])
-            diarized_html = group_by_speaker(words)
+            segments = group_by_speaker(words)
             
-            return transcript, raw_metadata, diarized_html
+            return transcript, raw_metadata, segments
+            
     except Exception as e:
-        err = f"Transcription failed: {str(e)}"
-        return err, None, err
+        print(f"Transcription exception: {e}")
+        return f"Transcription failed: {str(e)}", None, []
 
 @router.get("/")
 async def list_recordings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List all recordings for the current user"""
     recordings = db.query(Recording).filter(
         Recording.owner_id == current_user.id
     ).order_by(Recording.created_at.desc()).all()
@@ -141,7 +155,7 @@ async def list_recordings(
     return [{
         "id": r.id,
         "filename": r.filename,
-        "transcript": r.transcript[:150] + "..." if r.transcript and len(r.transcript) > 150 else r.transcript,
+        "transcript": (r.transcript or "")[:150] + "..." if r.transcript else "",
         "duration": r.duration,
-        "created_at": r.created_at.isoformat(),
+        "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in recordings]

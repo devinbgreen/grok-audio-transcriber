@@ -5,32 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grok Audio Transcriber</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 font-sans">
     <div class="max-w-5xl mx-auto">
-        <!-- Navbar -->
         <nav class="bg-white shadow border-b sticky top-0 z-50">
             <div class="px-8 py-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl">G</div>
                     <h1 class="text-3xl font-semibold tracking-tight">Grok Transcriber</h1>
                 </div>
-                <div class="flex items-center gap-8 text-sm">
-                    <button onclick="showAuthModal()" id="authBtn"
-                            class="px-6 py-2.5 bg-indigo-600 text-white rounded-2xl font-medium hover:bg-indigo-700">
-                        Login / Register
-                    </button>
-                </div>
+                <button onclick="showAuthModal()" id="authBtn" class="px-6 py-2.5 bg-indigo-600 text-white rounded-2xl font-medium hover:bg-indigo-700">
+                    Login / Register
+                </button>
             </div>
         </nav>
 
         <div class="p-8">
-            <!-- Recording Card -->
+            <!-- Recording -->
             <div class="bg-white rounded-3xl shadow-xl p-12 mb-10">
                 <div class="flex flex-col items-center text-center">
-                    <button id="recordBtn" onclick="toggleRecording()"
+                    <button id="recordBtn" onclick="toggleRecording()" 
                             class="w-40 h-40 rounded-full bg-red-500 hover:bg-red-600 text-white text-7xl shadow-2xl transition-all active:scale-95 flex items-center justify-center">
                         🎤
                     </button>
@@ -39,116 +34,130 @@
                 </div>
             </div>
 
-            <!-- Transcript Area -->
+            <!-- Transcript -->
             <div id="transcriptCard" class="hidden bg-white rounded-3xl shadow-xl p-8">
-                <div class="flex justify-between items-start mb-6">
-                    <h3 class="text-2xl font-semibold">Latest Transcription</h3>
-                    <button onclick="playAll()" class="px-5 py-2 bg-indigo-100 text-indigo-700 rounded-2xl text-sm font-medium">▶ Play Full</button>
-                </div>
-                
-                <audio id="audioPlayer" class="w-full mb-6"></audio>
-                
-                <div id="diarizedTranscript" class="prose max-w-none text-lg leading-relaxed transcript-container overflow-auto max-h-[420px] pr-4">
-                    <!-- Filled by JS after upload -->
-                </div>
-            </div>
-
-            <!-- History -->
-            <div class="mt-12">
-                <h3 class="font-semibold text-xl mb-6">Your Recordings</h3>
-                <div id="history" class="grid gap-4"></div>
+                <h3 class="text-2xl font-semibold mb-6">Latest Transcription</h3>
+                <audio id="audioPlayer" class="w-full mb-6" controls></audio>
+                <div id="diarizedTranscript" class="prose text-lg leading-relaxed max-h-[500px] overflow-auto p-6 bg-gray-50 rounded-2xl"></div>
             </div>
         </div>
     </div>
 
     <!-- Auth Modal -->
-    <div id="authModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
-        <!-- Modal content from previous version - register/login forms -->
+    <div id="authModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
         <div class="bg-white rounded-3xl p-10 w-full max-w-md">
             <div class="flex justify-between mb-6">
                 <h3 id="modalTitle" class="text-3xl font-bold">Sign Up</h3>
-                <button onclick="closeModal()" class="text-3xl text-gray-400">×</button>
+                <button onclick="closeModal()" class="text-3xl text-gray-400 hover:text-gray-600">×</button>
             </div>
-            <!-- Register Form -->
             <div id="registerForm">
                 <input id="regName" placeholder="Full Name" class="w-full border rounded-2xl px-5 py-4 mb-4">
                 <input id="regEmail" type="email" placeholder="Email" class="w-full border rounded-2xl px-5 py-4 mb-4">
                 <input id="regPass" type="password" placeholder="Password" class="w-full border rounded-2xl px-5 py-4 mb-8">
-                <button onclick="registerUser()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl text-lg font-semibold">Create Account</button>
+                <button onclick="registerUser()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold">Create Account</button>
                 <p class="text-center mt-6 text-sm">Already have an account? <a href="#" onclick="switchToLogin()" class="text-indigo-600">Log in</a></p>
             </div>
-            <!-- Login Form (hidden initially) -->
             <div id="loginForm" class="hidden">
                 <input id="loginEmail" type="email" placeholder="Email" class="w-full border rounded-2xl px-5 py-4 mb-4">
                 <input id="loginPass" type="password" placeholder="Password" class="w-full border rounded-2xl px-5 py-4 mb-8">
-                <button onclick="loginUser()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl text-lg font-semibold">Sign In</button>
+                <button onclick="loginUser()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold">Sign In</button>
                 <p class="text-center mt-6 text-sm">No account? <a href="#" onclick="switchToRegister()" class="text-indigo-600">Register</a></p>
             </div>
         </div>
     </div>
 
     <script>
-        let mediaRecorder, audioChunks = [], currentToken = null, currentAudioUrl = null, currentRecordingId = null;
+        let mediaRecorder, audioChunks = [], currentToken = null, currentAudioUrl = null;
         let timerInterval, seconds = 0, isRecording = false;
 
-        let currentSegments = [];
+        function showAuthModal() { document.getElementById("authModal").classList.remove("hidden"); }
+        function closeModal() { document.getElementById("authModal").classList.add("hidden"); }
+        function switchToLogin() {
+            document.getElementById("registerForm").classList.add("hidden");
+            document.getElementById("loginForm").classList.remove("hidden");
+            document.getElementById("modalTitle").textContent = "Sign In";
+        }
+        function switchToRegister() {
+            document.getElementById("loginForm").classList.add("hidden");
+            document.getElementById("registerForm").classList.remove("hidden");
+            document.getElementById("modalTitle").textContent = "Sign Up";
+        }
 
-        function toggleRecording() {
+        async function registerUser() {
+            const res = await fetch("/auth/register", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    email: document.getElementById("regEmail").value,
+                    password: document.getElementById("regPass").value,
+                    full_name: document.getElementById("regName").value
+                })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+                currentToken = data.access_token;
+                document.getElementById("authBtn").textContent = "Logged In ✓";
+                closeModal();
+            }
+        }
+
+        async function loginUser() {
+            const res = await fetch("/auth/login", {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: new URLSearchParams({
+                    username: document.getElementById("loginEmail").value,
+                    password: document.getElementById("loginPass").value
+                })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+                currentToken = data.access_token;
+                document.getElementById("authBtn").textContent = "Logged In ✓";
+                closeModal();
+            }
+        }
+
+        async function toggleRecording() {
             if (!currentToken) {
-                alert("Please log in or register first");
+                alert("Please login first");
                 showAuthModal();
                 return;
             }
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
-        }
 
-        async function startRecording() {
-            try {
+            if (!isRecording) {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
-                
+
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                    uploadAudio(blob);
-                };
-                
+                mediaRecorder.onstop = () => uploadAudio(new Blob(audioChunks, { type: 'audio/webm' }));
+
                 mediaRecorder.start();
                 isRecording = true;
                 document.getElementById("recordBtn").classList.add("recording");
-                document.getElementById("status").textContent = "Recording... (max 60s)";
+                document.getElementById("status").textContent = "Recording...";
                 startTimer();
-            } catch (err) {
-                alert("Microphone access error: " + err.message);
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById("recordBtn").classList.remove("recording");
+                document.getElementById("status").textContent = "Processing...";
+                stopTimer();
             }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder) mediaRecorder.stop();
-            isRecording = false;
-            document.getElementById("recordBtn").classList.remove("recording");
-            document.getElementById("status").textContent = "Processing...";
-            stopTimer();
         }
 
         function startTimer() {
             seconds = 0;
             timerInterval = setInterval(() => {
                 seconds++;
-                const display = `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds % 60).padStart(2,'0')}`;
-                document.getElementById("timer").textContent = display;
-                if (seconds >= 60) stopRecording();
+                document.getElementById("timer").textContent = 
+                    `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+                if (seconds >= 60) toggleRecording();
             }, 1000);
         }
 
-        function stopTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-        }
+        function stopTimer() { clearInterval(timerInterval); }
 
         async function uploadAudio(blob) {
             const formData = new FormData();
@@ -157,194 +166,24 @@
             try {
                 const res = await fetch("/recordings/upload", {
                     method: "POST",
-                    headers: { 
-                        "Authorization": `Bearer ${currentToken}` 
-                    },
+                    headers: { "Authorization": `Bearer ${currentToken}` },
                     body: formData
                 });
 
-                const text = await res.text();
-                let data;
-                
-                try {
-                    data = JSON.parse(text);
-                } catch (e) {
-                    console.error("Server response:", text);
-                    throw new Error("Server error: " + (text || "Unknown error"));
-                }
+                const data = await res.json();
 
-                if (!res.ok) {
-                    throw new Error(data.detail || "Upload failed");
-                }
-
-                if (data.segments || data.diarized_html) {
-                    // Success handling...
-                    currentSegments = data.segments || [];
-                    document.getElementById("diarizedTranscript").innerHTML = data.diarized_html || 
-                        currentSegments.map(...).join('');
+                if (data.diarized_html || data.segments) {
+                    document.getElementById("diarizedTranscript").innerHTML = data.diarized_html || "Transcription complete!";
                     document.getElementById("transcriptCard").classList.remove("hidden");
                     
-                    currentAudioUrl = URL.createObjectURL(blob);
                     const player = document.getElementById("audioPlayer");
-                    player.src = currentAudioUrl;
-                    
-                    document.getElementById("status").textContent = "Transcription complete!";
-                    loadHistory();
+                    player.src = URL.createObjectURL(blob);
+                    document.getElementById("status").textContent = "Done!";
                 }
             } catch (err) {
                 console.error(err);
-                document.getElementById("status").textContent = "Upload failed. Check console.";
                 alert("Upload failed: " + err.message);
             }
-        }
-
-        function renderDiarizedTranscript(segments) {
-            const container = document.getElementById("diarizedTranscript");
-            container.innerHTML = segments.map((seg, index) => `
-                <div onclick="playSegment(${seg.start || 0})" 
-                     class="transcript-segment p-4 mb-3 rounded-2xl cursor-pointer border-l-4 hover:shadow-md transition-all"
-                     style="border-color: ${['#1e40af', '#166534', '#9f1239', '#854d0e'][seg.speaker % 4]}">
-                    <div class="flex items-start gap-3">
-                        <span class="font-bold text-sm mt-0.5" style="color: ${['#1e40af', '#166534', '#9f1239', '#854d0e'][seg.speaker % 4]}">
-                            Speaker ${seg.speaker + 1}
-                        </span>
-                        <div class="flex-1">${seg.text}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function playSegment(startTime) {
-            const player = document.getElementById("audioPlayer");
-            if (player) {
-                player.currentTime = parseFloat(startTime) || 0;
-                player.play();
-            }
-        }
-
-        function playAll() {
-            const player = document.getElementById("audioPlayer");
-            if (player) player.play();
-        }
-
-        // Auth Functions
-        async function registerUser() {
-            const email = document.getElementById("regEmail").value.trim();
-            const password = document.getElementById("regPass").value.trim();
-            const full_name = document.getElementById("regName").value.trim();
-
-            if (!email || !password) return alert("Email and password required");
-
-            try {
-                const res = await fetch("/auth/register", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({email, password, full_name})
-                });
-                const data = await res.json();
-                if (data.access_token) {
-                    currentToken = data.access_token;
-                    document.getElementById("authBtn").innerHTML = "✓ Logged In";
-                    closeModal();
-                    loadHistory();
-                } else {
-                    alert(data.detail || "Registration failed");
-                }
-            } catch (e) {
-                alert("Registration error");
-            }
-        }
-
-        async function loginUser() {
-            const email = document.getElementById("loginEmail").value.trim();
-            const password = document.getElementById("loginPass").value.trim();
-
-            if (!email || !password) return alert("Email and password required");
-
-            try {
-                const res = await fetch("/auth/login", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                    body: new URLSearchParams({username: email, password: password})
-                });
-                const data = await res.json();
-                if (data.access_token) {
-                    currentToken = data.access_token;
-                    document.getElementById("authBtn").innerHTML = "✓ Logged In";
-                    closeModal();
-                    loadHistory();
-                } else {
-                    alert(data.detail || "Login failed");
-                }
-            } catch (e) {
-                alert("Login error");
-            }
-        }
-
-        // History & Delete
-        async function loadHistory() {
-            if (!currentToken) return;
-            try {
-                const res = await fetch("/recordings/", {
-                    headers: { "Authorization": `Bearer ${currentToken}` }
-                });
-                const recordings = await res.json();
-                
-                const container = document.getElementById("history");
-                container.innerHTML = recordings.map(r => `
-                    <div class="bg-white rounded-2xl shadow p-6 flex justify-between items-center">
-                        <div onclick="loadOldRecording(${r.id})" class="flex-1 cursor-pointer">
-                            <div class="font-medium">${r.filename.split('_').slice(2).join('_') || 'Recording'}</div>
-                            <div class="text-sm text-gray-500">${r.created_at ? new Date(r.created_at).toLocaleString() : ''} • ${r.duration}s</div>
-                            <div class="text-sm text-gray-600 mt-1 line-clamp-2">${r.transcript || ''}</div>
-                        </div>
-                        <button onclick="deleteRecording(${r.id}); event.stopImmediatePropagation()" 
-                                class="text-red-500 hover:text-red-700 px-3 py-1">Delete</button>
-                    </div>
-                `).join('');
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        async function deleteRecording(id) {
-            if (!confirm("Delete this recording?")) return;
-            try {
-                await fetch(`/recordings/${id}`, {
-                    method: "DELETE",
-                    headers: { "Authorization": `Bearer ${currentToken}` }
-                });
-                loadHistory();
-            } catch (e) {
-                alert("Delete failed");
-            }
-        }
-
-        async function loadOldRecording(id) {
-            // For future expansion - currently reloads latest for demo
-            alert("Loading old recording #" + id + " (feature coming soon - full history playback)");
-            // TODO: Fetch specific recording and render
-        }
-
-        // Modal helpers
-        function showAuthModal() {
-            document.getElementById("authModal").classList.remove("hidden");
-        }
-
-        function closeModal() {
-            document.getElementById("authModal").classList.add("hidden");
-        }
-
-        function switchToLogin() {
-            document.getElementById("registerForm").classList.add("hidden");
-            document.getElementById("loginForm").classList.remove("hidden");
-            document.getElementById("modalTitle").textContent = "Sign In";
-        }
-
-        function switchToRegister() {
-            document.getElementById("loginForm").classList.add("hidden");
-            document.getElementById("registerForm").classList.remove("hidden");
-            document.getElementById("modalTitle").textContent = "Sign Up";
         }
     </script>
 </body>
