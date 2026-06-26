@@ -68,25 +68,29 @@ async def upload_recording(
     if not file.filename.lower().endswith(('.webm', '.wav', '.mp3', '.m4a')):
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
-    # Save audio file
+    # Save original
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{current_user.id}_{timestamp}_{file.filename}"
-    file_path = os.path.join(AUDIO_STORAGE, filename)
+    original_filename = f"{current_user.id}_{timestamp}_{file.filename}"
+    original_path = os.path.join(AUDIO_STORAGE, original_filename)
     
-    with open(file_path, "wb") as buffer:
+    with open(original_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # Get duration
-    audio = AudioSegment.from_file(file_path)
+    # Convert to WAV for Grok STT compatibility
+    wav_path = original_path.rsplit('.', 1)[0] + ".wav"
+    audio = AudioSegment.from_file(original_path)
+    audio.export(wav_path, format="wav")
+
+    # Use WAV for transcription
+    transcript, raw_metadata, segments = await transcribe_with_grok(wav_path)
+
+    # Get duration from original
     duration = len(audio) // 1000
 
-    # Transcription with Grok STT + diarization
-    transcript, raw_metadata, segments = await transcribe_with_grok(file_path)
-
-    # Save to database
+    # Save recording (you can save the WAV or original)
     recording = Recording(
-        filename=filename,
-        file_path=file_path,
+        filename=original_filename,
+        file_path=wav_path,   # or original_path
         transcript=transcript,
         raw_metadata=raw_metadata,
         duration=duration,
@@ -98,11 +102,11 @@ async def upload_recording(
 
     return JSONResponse({
         "id": recording.id,
-        "filename": filename,
+        "filename": original_filename,
         "transcript": transcript,
         "segments": segments,
         "duration": duration,
-        "message": "Recording saved and transcribed!"
+        "message": "Recording transcribed successfully!"
     })
 
 async def transcribe_with_grok(audio_path: str):
