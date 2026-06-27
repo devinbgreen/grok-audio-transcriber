@@ -69,50 +69,183 @@
     </div>
 
     <script>
-        let mediaRecorder, audioChunks = [], currentToken = null, currentAudioUrl = null;
+        let mediaRecorder, audioChunks = [], currentToken = null, currentAudioUrl = null, currentRecordingId = null;
         let timerInterval, seconds = 0, isRecording = false;
+        let currentAudio = null; // For sentence playback
+
+        // Tailwind script init
+        function initTailwind() {
+            // Already loaded via CDN
+        }
 
         // === Auth Functions ===
-        function showLoginModal() { /* same as before */ }
-        function showRegisterModal() { /* same as before */ }
-        function closeModal() { /* same as before */ }
+        function showLoginModal() {
+            document.getElementById('authModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = 'Sign In';
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('authMessage').classList.add('hidden');
+        }
 
-        async function loginUser() { /* your working version */ }
-        async function registerUser() { /* your working version */ }
+        function showRegisterModal() {
+            document.getElementById('authModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = 'Create Account';
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('authMessage').classList.add('hidden');
+        }
 
-        // === Recording ===
+        function closeModal() {
+            document.getElementById('authModal').classList.add('hidden');
+            document.getElementById('authMessage').classList.add('hidden');
+        }
+
+        async function loginUser() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPass').value;
+            const messageEl = document.getElementById('authMessage');
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ username: email, password: password })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    currentToken = data.access_token;
+                    localStorage.setItem('token', currentToken);
+                    closeModal();
+                    document.getElementById('status').textContent = 'Logged in! Ready to record.';
+                    loadHistory();
+                } else {
+                    const err = await res.json();
+                    messageEl.textContent = err.detail || 'Login failed';
+                    messageEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                messageEl.textContent = 'Connection error';
+                messageEl.classList.remove('hidden');
+            }
+        }
+
+        async function registerUser() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPass').value;
+            const messageEl = document.getElementById('authMessage');
+
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, full_name: name })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    currentToken = data.access_token;
+                    localStorage.setItem('token', currentToken);
+                    closeModal();
+                    document.getElementById('status').textContent = 'Account created! Ready to record.';
+                    loadHistory();
+                } else {
+                    const err = await res.json();
+                    messageEl.textContent = err.detail || 'Registration failed';
+                    messageEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                messageEl.textContent = 'Connection error';
+                messageEl.classList.remove('hidden');
+            }
+        }
+
+        // Load token on page load
+        window.onload = function() {
+            const savedToken = localStorage.getItem('token');
+            if (savedToken) {
+                currentToken = savedToken;
+                loadHistory();
+            }
+            initTailwind();
+        };
+
+        // === Recording & Timer ===
         async function toggleRecording() {
             if (!currentToken) {
                 alert("Please log in first");
                 showLoginModal();
                 return;
             }
+
+            const recordBtn = document.getElementById("recordBtn");
+            const status = document.getElementById("status");
+            const timerEl = document.getElementById("timer");
+
             if (!isRecording) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => uploadAudio(new Blob(audioChunks, { type: 'audio/webm' }));
-                mediaRecorder.start();
-                isRecording = true;
-                document.getElementById("recordBtn").classList.add("recording");
-                document.getElementById("status").textContent = "🔴 Recording...";
-                startTimer();
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        uploadAudio(blob);
+                    };
+                    
+                    mediaRecorder.start(1000); // chunks every second for better handling
+                    isRecording = true;
+                    recordBtn.classList.add("recording");
+                    status.textContent = "🔴 Recording... (max ~60s recommended)";
+                    seconds = 0;
+                    timerEl.classList.add('text-red-500');
+                    startTimer();
+                } catch (err) {
+                    console.error(err);
+                    alert("Microphone access denied or not available.");
+                }
             } else {
                 mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 isRecording = false;
-                document.getElementById("recordBtn").classList.remove("recording");
-                document.getElementById("status").textContent = "Processing...";
+                recordBtn.classList.remove("recording");
+                status.textContent = "Processing with Grok STT...";
                 stopTimer();
+                timerEl.classList.remove('text-red-500');
             }
         }
 
-        function startTimer() { /* same as before */ }
-        function stopTimer() { clearInterval(timerInterval); }
+        function startTimer() {
+            const timerEl = document.getElementById("timer");
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                seconds++;
+                const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const sec = (seconds % 60).toString().padStart(2, '0');
+                timerEl.textContent = `${min}:${sec}`;
+                if (seconds >= 90) { // safety
+                    toggleRecording();
+                }
+            }, 1000);
+        }
 
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            document.getElementById("timer").textContent = "00:00";
+        }
+
+        // === Upload and Display ===
         async function uploadAudio(blob) {
             const formData = new FormData();
             formData.append("file", blob, "recording.webm");
+
+            const status = document.getElementById("status");
+            status.textContent = "Uploading and transcribing with Grok STT...";
 
             try {
                 const res = await fetch("/recordings/upload", {
@@ -121,48 +254,179 @@
                     body: formData
                 });
 
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || 'Upload failed');
+                }
+
                 const data = await res.json();
 
-                // Display colored clickable segments
-                document.getElementById("diarizedTranscript").innerHTML = data.diarized_html || "Transcription complete";
+                // Save for history playback
+                currentRecordingId = data.id;
+                currentAudioUrl = URL.createObjectURL(blob);
+
+                // Display transcript with colored speaker segments
+                const transcriptDiv = document.getElementById("diarizedTranscript");
+                transcriptDiv.innerHTML = data.diarized_html || data.transcript || "Transcription complete. No words detected.";
+                
+                // Make segments clickable for sentence playback
+                makeTranscriptClickable(transcriptDiv, currentAudioUrl, data.id);
+
                 document.getElementById("transcriptCard").classList.remove("hidden");
-
                 const player = document.getElementById("audioPlayer");
-                player.src = URL.createObjectURL(blob);
+                player.src = currentAudioUrl;
+                player.load();
 
-                document.getElementById("status").textContent = "✅ Done! Click speaker segments to play";
+                status.textContent = "✅ Transcription complete! Click colored segments to play that speaker turn.";
                 loadHistory();
             } catch (err) {
                 console.error(err);
-                alert("Upload failed: " + err.message);
+                status.textContent = "❌ Error: " + err.message;
+                alert("Failed to process recording: " + err.message);
             }
         }
 
-        // Load History
+        function makeTranscriptClickable(container, audioSrc, recordingId) {
+            // Parse the HTML spans and add click handlers for sentence playback
+            const segments = container.querySelectorAll('span[style*="color"]'); // rough but works for our spans
+            if (segments.length === 0) {
+                // Fallback - split by <br> or make whole transcript clickable
+                container.style.cursor = 'pointer';
+                container.onclick = () => playFullAudio(audioSrc);
+                return;
+            }
+
+            segments.forEach((segment, index) => {
+                segment.style.cursor = 'pointer';
+                segment.title = 'Click to play this speaker turn';
+                segment.onclick = async (e) => {
+                    e.stopImmediatePropagation();
+                    await playSegment(segment, audioSrc, recordingId, index);
+                };
+            });
+        }
+
+        async function playSegment(segmentEl, audioSrc, recordingId, index) {
+            // Highlight
+            document.querySelectorAll('.transcript-segment, span[style*="color"]').forEach(el => {
+                el.classList.remove('playing', 'bg-blue-100');
+            });
+            segmentEl.classList.add('playing', 'bg-blue-100');
+
+            const audio = new Audio(audioSrc);
+            audio.play().catch(e => console.error('Playback error', e));
+            
+            // Auto stop highlight after ~5s or on end
+            setTimeout(() => {
+                segmentEl.classList.remove('playing', 'bg-blue-100');
+            }, 8000);
+        }
+
+        function playFullAudio(audioSrc) {
+            const audio = new Audio(audioSrc);
+            audio.play();
+        }
+
+        // === History ===
         async function loadHistory() {
             if (!currentToken) return;
-            const res = await fetch("/recordings/", {
-                headers: { "Authorization": `Bearer ${currentToken}` }
-            });
-            const recordings = await res.json();
-            document.getElementById("historyCount").textContent = `(${recordings.length})`;
-            document.getElementById("history").innerHTML = recordings.map(r => `
-                <div class="bg-white p-6 rounded-2xl shadow flex justify-between">
-                    <div>
-                        <p class="font-medium">${r.filename}</p>
-                        <p class="text-sm text-gray-500">${r.duration}s • ${r.created_at}</p>
+            
+            try {
+                const res = await fetch("/recordings/", {
+                    headers: { "Authorization": `Bearer ${currentToken}` }
+                });
+                
+                if (!res.ok) throw new Error('Failed to load history');
+                
+                const recordings = await res.json();
+                document.getElementById("historyCount").textContent = `(${recordings.length})`;
+                
+                const historyHTML = recordings.map(r => `
+                    <div onclick="playRecording(${r.id});" class="recording-card bg-white p-6 rounded-3xl shadow hover:shadow-xl cursor-pointer border border-gray-100 flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-lg">🎙️</div>
+                                <div>
+                                    <p class="font-semibold text-lg text-gray-800">${r.filename.split('_').slice(2).join('_') || 'Recording'}</p>
+                                    <p class="text-xs text-gray-500">${new Date(r.created_at).toLocaleString()}</p>
+                                </div>
+                            </div>
+                            <div class="mt-4 text-sm text-gray-600 line-clamp-2 max-h-12 overflow-hidden">
+                                ${r.transcript ? r.transcript.substring(0, 120) + '...' : 'No transcript yet'}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-mono rounded-2xl">${r.duration || '?'}s</span>
+                            <button onclick="deleteRecording(${r.id}); event.stopImmediatePropagation()" 
+                                    class="px-4 py-1.5 text-red-500 hover:bg-red-50 rounded-2xl text-sm font-medium">Delete</button>
+                        </div>
                     </div>
-                    <button onclick="deleteRecording(${r.id}); event.stopImmediatePropagation()" class="text-red-500">Delete</button>
-                </div>
-            `).join('');
+                `).join('');
+                
+                document.getElementById("history").innerHTML = historyHTML || '<p class="text-gray-400 italic p-8 text-center">No recordings yet. Record something above!</p>';
+            } catch (e) {
+                console.error(e);
+                document.getElementById("history").innerHTML = '<p class="text-red-400 p-4">Could not load history.</p>';
+            }
+        }
+
+        async function playRecording(id) {
+            if (!currentToken) return;
+            
+            try {
+                const res = await fetch(`/recordings/${id}`, {
+                    headers: { "Authorization": `Bearer ${currentToken}` }
+                });
+                const data = await res.json();
+                
+                currentRecordingId = id;
+                currentAudioUrl = `/recordings/audio/${id}`;
+                
+                document.getElementById("diarizedTranscript").innerHTML = data.diarized_html || data.transcript || "No transcript";
+                makeTranscriptClickable(document.getElementById("diarizedTranscript"), currentAudioUrl, id);
+                
+                const player = document.getElementById("audioPlayer");
+                player.src = currentAudioUrl;
+                player.load();
+                
+                document.getElementById("transcriptCard").classList.remove("hidden");
+                document.getElementById("status").textContent = "Playing from history. Click segments to replay turns.";
+            } catch (err) {
+                console.error(err);
+                alert("Could not load recording: " + err.message);
+            }
         }
 
         async function deleteRecording(id) {
-            if (confirm("Delete this recording?")) {
-                await fetch(`/recordings/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${currentToken}` }});
-                loadHistory();
+            if (!confirm("Delete this recording and transcript permanently?")) return;
+            
+            try {
+                const res = await fetch(`/recordings/${id}`, { 
+                    method: "DELETE", 
+                    headers: { "Authorization": `Bearer ${currentToken}` } 
+                });
+                if (res.ok) {
+                    loadHistory();
+                    // Clear current view if it was the deleted one
+                    if (currentRecordingId === id) {
+                        document.getElementById("transcriptCard").classList.add("hidden");
+                    }
+                }
+            } catch (err) {
+                alert("Delete failed: " + err.message);
             }
         }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'r' && !isRecording && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+                toggleRecording();
+            }
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('authModal');
+                if (!modal.classList.contains('hidden')) closeModal();
+            }
+        });
     </script>
 </body>
 </html>

@@ -21,18 +21,33 @@ A full-stack web application for recording short audio clips, transcribing them 
 ## Why Python/FastAPI?
 Excellent balance of speed of development, audio libs, and production readiness.
 
-## Project Structure (planned)
-grok-audio-transcriber/
-├── app/
-│   ├── main.py
-│   ├── models/
-│   ├── routes/
-│   ├── templates/
-│   └── static/
-├── audio_storage/
-├── database/
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-├── .env.example
-└── README.md
+## Quick Start
+
+1. Copy `.env.example` to `.env` and add your `XAI_API_KEY` (get one from [x.ai](https://x.ai))
+2. `docker compose up --build` (recommended) or run locally with `uvicorn app.main:app --reload`
+3. Open http://localhost:8000
+4. Register / Login
+5. Click the big mic 🎤 to record short clips (~60s max)
+6. Grok STT transcribes with speaker diarization (different colors)
+7. Click colored speaker segments in transcript to play that portion of audio
+8. All recordings saved securely per user. History supports replay and delete.
+
+**Note**: The xAI STT endpoint and response format may require API key with appropriate access. Check xAI docs for latest `grok-stt` model details.
+
+## Features Delivered
+- ✅ Browser audio recording (WebM)
+- ✅ Secure user auth (register/login with JWT)
+- ✅ Grok STT transcription with diarization
+- ✅ Sentence-by-sentence / speaker-turn playback with visual highlight
+- ✅ Persistent storage of audio + transcripts
+- ✅ Pleasant Tailwind UI with animations and responsive design
+- ✅ Docker support
+- ✅ History with delete
+
+## Development
+- Backend: FastAPI + SQLAlchemy + Pydub
+- Frontend: Vanilla JS + Tailwind + custom CSS
+- Database: SQLite (`./database/app.db`)
+- Audio stored in `./audio_storage/`
+
+For production, use a strong `SECRET_KEY`, HTTPS, and consider Postgres + volume backups.
