@@ -2,6 +2,15 @@
 
 A full-stack web application for recording short audio clips, transcribing them using xAI's Grok STT API, and managing transcripts with user authentication.
 
+## Motivation
+
+This project is a stepping stone to near real-time, automatic Reverse Speech Metaphor disclosure. 
+Who would want the pwer of truth, straight from the subconscious, conveniently at their finger tips?
+
+## Usage
+
+Log in and record =]
+
 ## Features
 - **Audio Recording**: Record short audio clips (up to ~1 minute) directly in the browser.
 - **Transcription**: Powered by Grok STT with speaker diarization, word-level timestamps.
@@ -49,5 +58,8 @@ Excellent balance of speed of development, audio libs, and production readiness.
 - Frontend: Vanilla JS + Tailwind + custom CSS
 - Database: SQLite (`./database/app.db`)
 - Audio stored in `./audio_storage/`
+
+## Contributing
+- Needs some bug fixing honestly
 
 For production, use a strong `SECRET_KEY`, HTTPS, and consider Postgres + volume backups.
